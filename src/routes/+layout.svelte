@@ -5,7 +5,7 @@
 	let { children } = $props();
 
 	const SITE_TITLE = "svmd";
-	const SITE_DESC = "no bs markdown renderer";
+	const SITE_DESC = "Extremely fast, no-BS Markdown renderer";
 
 	const SITE_URL = "https://md.mkaran.com.np/";
 	const SITE_IMAGE = `${SITE_URL}/og-preview.png`;
