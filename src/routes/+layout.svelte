@@ -7,7 +7,7 @@
 	const SITE_TITLE = "svmd";
 	const SITE_DESC = "no bs markdown renderer";
 
-	const SITE_URL = "https://svmd.app";
+	const SITE_URL = "https://md.mkaran.com.np/";
 	const SITE_IMAGE = `${SITE_URL}/og-preview.png`;
 
 	const schemaOrg = {

@@ -1,6 +1,6 @@
-an extremely fast, no-bs markdown renderer.
+Extremely fast, no-BS Markdown renderer.
 
-supported languages for now:
+Supported languages for now:
 
 ```ts
 [

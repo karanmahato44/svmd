@@ -30,7 +30,7 @@
 			const cached = await get<string>(STORAGE_KEY);
 			source =
 				cached ??
-				`An extremely fast, no-BS Markdown renderer.
+				`Extremely fast, no-BS Markdown renderer.
 
 \`\`\`py
 print(chr(sum(range(ord(min(str(not())))))))
@@ -99,7 +99,7 @@ print(chr(sum(range(ord(min(str(not())))))))
 <main class="h-screen w-screen overflow-hidden bg-black font-sans text-zinc-300 selection:bg-zinc-800">
 	<Resizable.PaneGroup direction="horizontal" class="h-full w-full" autoSaveId="svmd-layout-v1">
 		<Resizable.Pane defaultSize={50} minSize={MIN_PANE_SIZE} class="h-full">
-			<section class="relative h-full w-full bg-black" aria-label="MarOkdown editor">
+			<section class="relative h-full w-full bg-black" aria-label="Markdown editor">
 				<textarea
 					bind:this={editorRef}
 					bind:value={source}
