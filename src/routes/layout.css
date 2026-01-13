@@ -119,4 +119,8 @@
 		@apply bg-background text-foreground;
 		background-color: #000000;
 	}
+	::-webkit-scrollbar {
+		width: 6px;
+		height: 6px;
+	}
 }
