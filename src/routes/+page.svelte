@@ -20,6 +20,7 @@
 
 	onMount(async () => {
 		if (!browser) return;
+
 		worker = new MarkdownWorker();
 		worker.onmessage = (e: MessageEvent<MainMessage>) => {
 			if (e.data.type === "RESULT") renderedHtml = e.data.html;
@@ -35,11 +36,12 @@
 \`\`\`py
 print(chr(sum(range(ord(min(str(not())))))))
 \`\`\``;
-
 			triggerRender(source);
 		} catch (err) {
 			console.error("IDB Error", err);
 		}
+
+		editorRef?.focus();
 	});
 
 	onDestroy(() => {
@@ -78,6 +80,7 @@ print(chr(sum(range(ord(min(str(not())))))))
 	const handlePreviewClick = async (e: MouseEvent) => {
 		const target = (e.target as HTMLElement).closest(".copy-btn") as HTMLButtonElement;
 		if (!target) return;
+
 		e.preventDefault();
 		const code = target.getAttribute("data-code");
 		if (code) {
@@ -179,6 +182,7 @@ print(chr(sum(range(ord(min(str(not())))))))
 		color: #f4f4f5;
 		letter-spacing: -0.025em;
 	}
+
 	:global(.markdown-body > *:first-child) {
 		margin-top: 0;
 	}
@@ -187,6 +191,7 @@ print(chr(sum(range(ord(min(str(not())))))))
 		margin-bottom: 0.75em;
 		color: #a1a1aa;
 	}
+
 	:global(.markdown-body p:last-child) {
 		margin-bottom: 0;
 	}
@@ -195,6 +200,7 @@ print(chr(sum(range(ord(min(str(not())))))))
 		color: #60a5fa;
 		text-decoration: none;
 	}
+
 	:global(.markdown-body a:hover) {
 		text-decoration: underline;
 	}
@@ -208,15 +214,18 @@ print(chr(sum(range(ord(min(str(not())))))))
 		padding-left: 1.5em;
 		list-style-type: disc;
 	}
+
 	:global(.markdown-body ol) {
 		margin: 0.5em 0;
 		padding-left: 1.5em;
 		list-style-type: decimal;
 	}
+
 	:global(.markdown-body li) {
 		margin: 0.25em 0;
 		color: #a1a1aa;
 	}
+
 	:global(.markdown-body li::marker) {
 		color: #52525b;
 	}
@@ -240,6 +249,7 @@ print(chr(sum(range(ord(min(str(not())))))))
 		line-height: 1.5;
 		overflow-x: auto;
 	}
+
 	:global(code) {
 		font-family: ui-monospace, monospace;
 	}
@@ -249,15 +259,19 @@ print(chr(sum(range(ord(min(str(not())))))))
 		grid-template-rows: 0fr;
 		transition: grid-template-rows 0.15s ease-out;
 	}
+
 	:global(details[open] > div) {
 		grid-template-rows: 1fr;
 	}
+
 	:global(details > div > div) {
 		overflow: hidden;
 	}
+
 	:global(details > summary) {
 		list-style: none;
 	}
+
 	:global(details > summary::-webkit-details-marker) {
 		display: none;
 	}
