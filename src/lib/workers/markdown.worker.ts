@@ -48,7 +48,8 @@ const SUPPORTED_LANGUAGES: BundledLanguage[] = [
 	"haskell",
 	"perl",
 	"powershell",
-	"vue"
+	"vue",
+	"scss"
 ];
 
 const LANGUAGE_ALIASES: Record<string, BundledLanguage> = {
