@@ -1,4 +1,4 @@
-Extremely fast, no-BS Markdown renderer.
+Extremely fast, no-BS Markdown preview.
 
 Supported languages for now:
 
