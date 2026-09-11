@@ -4,16 +4,17 @@
 
 	let {
 		ref = $bindable(null),
-		this: paneGroup = $bindable(),
+		api = $bindable(),
 		class: className,
 		...restProps
 	}: ResizablePrimitive.PaneGroupProps & {
-		this?: ResizablePrimitive.PaneGroup;
+		api?: { getLayout: () => number[]; setLayout: (layout: number[]) => void; getId: () => string };
 	} = $props();
 </script>
 
 <ResizablePrimitive.PaneGroup
-	bind:this={paneGroup}
+	bind:this={api}
+	bind:ref={ref}
 	data-slot="resizable-pane-group"
 	class={cn("flex h-full w-full data-[direction=vertical]:flex-col", className)}
 	{...restProps}

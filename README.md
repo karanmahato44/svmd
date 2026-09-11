@@ -56,3 +56,5 @@ Supported languages for now:
 	// yml: "yaml"
 ]
 ```
+
+Export `.md`: <kbd>ctrl</kbd>/<kbd>cmd</kbd> + <kbd>e</kbd>.

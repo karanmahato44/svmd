@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { browser } from "$app/environment";
 	import favicon from "$lib/assets/favicon.svg";
+	import { onMount } from "svelte";
 	import "./layout.css";
 
 	let { children } = $props();
@@ -19,6 +21,54 @@
 		applicationCategory: "DeveloperApplication",
 		operatingSystem: "Any"
 	};
+	const schemaOrgJson = JSON.stringify(schemaOrg).replace(/</g, "\\u003c");
+
+	const THEME_STORAGE_KEY = "svmd_theme_v1";
+
+	type Theme = "dark" | "light";
+
+	const applyTheme = (theme: Theme) => {
+		if (!browser) return;
+
+		document.documentElement.classList.toggle("light", theme === "light");
+		document.documentElement.classList.toggle("dark", theme === "dark");
+		document.documentElement.style.colorScheme = theme;
+		document
+			.querySelector('meta[name="theme-color"]')
+			?.setAttribute("content", theme === "light" ? "#f6f7f2" : "#000000");
+
+		try {
+			localStorage.setItem(THEME_STORAGE_KEY, theme);
+		} catch {
+			// Theme still applies for the current session when storage is unavailable.
+		}
+	};
+
+	onMount(() => {
+		let storedTheme: string | null;
+		try {
+			storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+		} catch {
+			storedTheme = null;
+		}
+		applyTheme(storedTheme === "light" ? "light" : "dark");
+
+		const handleKeydown = (event: KeyboardEvent) => {
+			if (event.defaultPrevented || event.repeat || event.altKey || event.shiftKey) return;
+			if (!(event.ctrlKey || event.metaKey)) return;
+			if (event.code !== "Slash" && event.key !== "/") return;
+
+			event.preventDefault();
+			const nextTheme = document.documentElement.classList.contains("light") ? "dark" : "light";
+			applyTheme(nextTheme);
+		};
+
+		window.addEventListener("keydown", handleKeydown);
+
+		return () => {
+			window.removeEventListener("keydown", handleKeydown);
+		};
+	});
 </script>
 
 <svelte:head>
@@ -51,7 +101,8 @@
 	<meta property="twitter:image" content={SITE_IMAGE} />
 
 	<!-- structured data (json-ld) -->
-	{@html `<script type="application/ld+json">${JSON.stringify(schemaOrg)}</script>`}
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+	{@html `<script type="application/ld+json">${schemaOrgJson}</scr` + `ipt>`}
 </svelte:head>
 
 {@render children()}

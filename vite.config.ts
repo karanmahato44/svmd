@@ -2,9 +2,22 @@ import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
+import { languages } from "./src/lib/markdown/languages.ts";
 
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
+	// Discover worker-only imports before serving tests/dev pages to avoid reloads mid-render.
+	optimizeDeps: {
+		include: [
+			"markdown-it",
+			"shiki/core",
+			"shiki/engine/oniguruma",
+			"shiki/wasm",
+			"shiki/themes/vitesse-dark.mjs",
+			"shiki/themes/vitesse-light.mjs",
+			...Object.keys(languages).map((language) => `shiki/langs/${language}.mjs`)
+		]
+	},
 
 	worker: {
 		format: "es"
@@ -22,7 +35,9 @@ export default defineConfig({
 
 					browser: {
 						enabled: true,
-						provider: playwright(),
+						provider: playwright({
+							launchOptions: { channel: process.env.SVMD_TEST_BROWSER_CHANNEL || undefined }
+						}),
 						instances: [{ browser: "chromium", headless: true }]
 					},
 

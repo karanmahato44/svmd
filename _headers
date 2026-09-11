@@ -1,0 +1,11 @@
+# Adapter Cloudflare copies this root file to the deployment assets directory.
+# Asset responses bypass SvelteKit's server hook.
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+
+# Workers receive their own CSP. The adapter appends immutable cache rules.
+/_app/immutable/*
+  Content-Security-Policy: default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'

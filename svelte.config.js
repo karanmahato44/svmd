@@ -9,6 +9,23 @@ const config = {
 
 	kit: {
 		adapter: adapter(),
+		csp: {
+			mode: "auto",
+			directives: {
+				"default-src": ["self"],
+				"script-src": ["self"],
+				// Syntax highlighting and pane sizes use generated inline styles.
+				"style-src": ["self", "unsafe-inline"],
+				"img-src": ["self", "data:", "blob:", "https:"],
+				"connect-src": ["self", ...(process.env.NODE_ENV === "production" ? [] : ["ws:", "wss:"])],
+				"worker-src": ["self"],
+				"object-src": ["none"],
+				"base-uri": ["none"],
+				"frame-src": ["none"],
+				"frame-ancestors": ["none"],
+				"form-action": ["self"]
+			}
+		},
 		alias: {
 			"@/*": "./path/to/lib/*"
 		}
