@@ -201,7 +201,10 @@
 		const code = target.closest(".svmd-code-block, .svmd-warn-block")?.querySelector("pre code");
 		if (!code) return;
 		try {
-			await navigator.clipboard.writeText(code.textContent ?? "");
+			const text = code.textContent ?? "";
+			let end = text.length;
+			while (end > 0 && (text[end - 1] === "\n" || text[end - 1] === "\r")) end--;
+			await navigator.clipboard.writeText(text.slice(0, end));
 			target.dataset.copied = "true";
 			target.setAttribute("aria-label", "Copied code");
 			setTimeout(() => {

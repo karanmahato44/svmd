@@ -182,7 +182,7 @@ describe("Markdown editor", () => {
 		expect(Number(pane.style.flexGrow)).toBe(50);
 	});
 
-	it("copies code exactly without collapsing its details", async () => {
+	it("copies code without its trailing newline or collapsing its details", async () => {
 		await mounted();
 		harness.respond(
 			result(
@@ -192,8 +192,24 @@ describe("Markdown editor", () => {
 		);
 		const write = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
 		await page.getByRole("button", { name: "Copy code" }).click();
-		expect(write).toHaveBeenCalledWith("<safe>\n");
+		expect(write).toHaveBeenCalledWith("<safe>");
 		expect(document.querySelector("details")?.open).toBe(true);
+	});
+
+	it.each([
+		["  first\n\n\tsecond  \n\n", "  first\n\n\tsecond  "],
+		["first\r\nsecond\r\n\r\n", "first\r\nsecond"],
+		["  command  ", "  command  "]
+	])("preserves internal whitespace when copying %j", async (source, expected) => {
+		await mounted();
+		harness.respond(
+			result(harness.requests[0].id, '<div class="svmd-code-block"><button class="copy-btn" aria-label="Copy code"></button><pre><code></code></pre></div>')
+		);
+		await tick();
+		document.querySelector("pre code")!.textContent = source;
+		const write = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+		await page.getByRole("button", { name: "Copy code" }).click();
+		expect(write).toHaveBeenCalledWith(expected);
 	});
 
 	it("keeps the copy icon visible in both themes", async () => {
