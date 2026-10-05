@@ -1,8 +1,8 @@
 <script lang="ts">
-	import * as Resizable from "$lib/components/ui/resizable/index.js";
-	import { getSourcePage, SOURCE_PAGE_SIZE } from "$lib/markdown/pagination";
-	import type { MainMessage, WorkerMessage } from "$lib/types/types";
-	import MarkdownWorker from "$lib/workers/markdown.worker?worker";
+	import SplitPane from "#lib/components/SplitPane.svelte";
+	import { getSourcePage, SOURCE_PAGE_SIZE } from "#lib/markdown/pagination.ts";
+	import type { MainMessage, WorkerMessage } from "#lib/types/types.ts";
+	import MarkdownWorker from "#lib/workers/markdown.worker.ts?worker";
 	import { get, set } from "idb-keyval";
 	import { onMount, tick } from "svelte";
 
@@ -19,10 +19,7 @@
 	let simplified = $state(false);
 	let editorRef: HTMLTextAreaElement;
 	let previewRef: HTMLElement;
-	let paneGroup: { getLayout: () => number[]; setLayout: (layout: number[]) => void; getId: () => string } | undefined =
-		$state();
 	let worker: Worker | null = null;
-	let workerSource: string | null = null;
 	let revision = 0;
 	let edited = false;
 	let disposed = false;
@@ -37,7 +34,6 @@
 	function failRender() {
 		worker?.terminate();
 		worker = null;
-		workerSource = null;
 		busy = false;
 		loading = false;
 		renderError = "Preview could not finish. Your source is safe; retry or export it.";
@@ -76,11 +72,8 @@
 		ready = false;
 		busy = true;
 		loading = true;
-		const request: WorkerMessage =
-			workerSource === source
-				? { type: "PAGE", id: revision, page: sourcePage.page }
-				: { type: "RENDER", id: revision, content: source, page: sourcePage.page };
-		workerSource = source;
+		// Only copy the visible section across threads, regardless of document size.
+		const request: WorkerMessage = { type: "RENDER", id: revision, page: sourcePage };
 		watchdog = setTimeout(failRender, 10000);
 		try {
 			worker.postMessage(request);
@@ -146,22 +139,80 @@
 		changed();
 	}
 
+	async function onEditorKeydown(event: KeyboardEvent) {
+		if (
+			event.defaultPrevented ||
+			event.isComposing ||
+			event.key !== "Enter" ||
+			!event.shiftKey ||
+			event.altKey ||
+			!(event.ctrlKey || event.metaKey)
+		)
+			return;
+		event.preventDefault();
+		const input = event.currentTarget as HTMLTextAreaElement;
+		const { start, end, content } = sourcePage;
+		const value = input.value;
+		// Textareas normalize CRLF, so calculate offsets against the displayed text.
+		const currentSource = content === value ? source : source.slice(0, start) + value + source.slice(end);
+		const cursor = start + input.selectionStart;
+		const lineStart = cursor === 0 ? 0 : currentSource.lastIndexOf("\n", cursor - 1) + 1;
+		let indentEnd = lineStart;
+		while (currentSource[indentEnd] === " " || currentSource[indentEnd] === "\t") indentEnd++;
+		const insertion = currentSource.slice(lineStart, indentEnd) + "\n";
+		let inserted = false;
+		if (lineStart >= start && indentEnd <= start + value.length) {
+			input.setSelectionRange(lineStart - start, lineStart - start);
+			const previousRevision = revision;
+			try {
+				// Native insertion preserves the textarea's undo history where supported.
+				inserted = document.execCommand("insertText", false, insertion);
+			} catch {
+				// Fall back to a source edit when native insertion is unavailable.
+			}
+			if (inserted && revision === previousRevision) input.dispatchEvent(new Event("input", { bubbles: true }));
+		}
+		if (!inserted) {
+			// A logical line can begin in the preceding section of a large document.
+			source = currentSource.slice(0, lineStart) + insertion + currentSource.slice(lineStart);
+			changed();
+		}
+		pageIndex = Math.floor(indentEnd / SOURCE_PAGE_SIZE);
+		await tick();
+		if (disposed) return;
+		const caret = indentEnd - sourcePage.start;
+		input.setSelectionRange(caret, caret);
+	}
+
 	async function onPaste(event: ClipboardEvent) {
 		if (!event.clipboardData?.types.includes("text/plain")) return;
 		const text = event.clipboardData.getData("text/plain");
-		const start = sourcePage.start + editorRef.selectionStart;
-		const end = sourcePage.start + editorRef.selectionEnd;
+		const { start: pageStart, end: pageEnd, content } = sourcePage;
+		const { value, selectionStart, selectionEnd } = editorRef;
 		// Let normal documents keep the textarea's native paste/undo behavior.
-		if (source.length - (end - start) + text.length <= SOURCE_PAGE_SIZE) return;
+		if (
+			source.length - content.length + value.length - (selectionEnd - selectionStart) + text.length <=
+			SOURCE_PAGE_SIZE
+		)
+			return;
 		event.preventDefault();
-		source = source.slice(0, start) + text + source.slice(end);
+		// Selection offsets belong to the textarea's normalized newlines, not the raw source.
+		source =
+			source.slice(0, pageStart) +
+			value.slice(0, selectionStart) +
+			text +
+			value.slice(selectionEnd) +
+			source.slice(pageEnd);
 		// Keep a large paste at its beginning so the inserted text stays visible.
 		changed();
 		await tick();
-		editorRef.setSelectionRange(
-			Math.min(start - sourcePage.start + text.length, sourcePage.content.length),
-			Math.min(start - sourcePage.start + text.length, sourcePage.content.length)
+		if (disposed) return;
+		const offset = Math.max(
+			0,
+			Math.min(pageStart + selectionStart + text.length - sourcePage.start, sourcePage.content.length)
 		);
+		const caret = sourcePage.content.slice(0, offset).replace(/\r\n?/g, "\n").length;
+		editorRef.setSelectionRange(caret, caret);
 	}
 
 	function changePage(next: number) {
@@ -172,11 +223,15 @@
 	}
 
 	function exportMarkdown() {
+		const now = new Date();
+		const pad = (value: number) => String(value).padStart(2, "0");
+		const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+		const time = `${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
 		const blob = new Blob([source], { type: "text/markdown;charset=utf-8" });
 		const url = URL.createObjectURL(blob);
 		const anchor = document.createElement("a");
 		anchor.href = url;
-		anchor.download = "document.md";
+		anchor.download = `document-${date}_${time}.md`;
 		anchor.click();
 		setTimeout(() => {
 			URL.revokeObjectURL(url);
@@ -263,22 +318,23 @@
 </script>
 
 <main
-	class="flex h-dvh w-full flex-col overflow-hidden bg-[var(--app-bg)] font-sans text-[var(--app-text)] selection:bg-[var(--pane-border)]"
+	class="flex h-dvh w-full flex-col overflow-hidden bg-(--app-bg) font-sans text-(--app-text) selection:bg-(--pane-border)"
 >
 	{#if notice}
 		<p role="status" class="border-b border-border px-4 py-2 text-xs">{notice}</p>
 	{/if}
 	<div class="min-h-0 flex-1">
-		<Resizable.PaneGroup bind:api={paneGroup} direction="horizontal" class="h-full w-full" autoSaveId="svmd-layout-v1">
-			<Resizable.Pane defaultSize={50} minSize={20} class="h-full min-w-0">
+		<SplitPane>
+			{#snippet editor()}
 				<section class="relative h-full w-full" aria-label="Markdown editor">
 					<textarea
 						bind:this={editorRef}
 						value={sourcePage.content}
 						oninput={onInput}
+						onkeydown={onEditorKeydown}
 						onpaste={onPaste}
 						onscroll={handleScroll}
-						class="h-full w-full resize-none scrollbar-thin border-0 bg-transparent p-4 font-mono text-[13px] leading-6 text-[var(--editor-text)] outline-none placeholder:text-[var(--placeholder)] focus:ring-0"
+						class="h-full w-full resize-none border-0 bg-transparent p-4 font-mono text-[13px] leading-6 text-(--editor-text) outline-none placeholder:text-(--placeholder) focus:ring-0"
 						placeholder="Type markdown..."
 						spellcheck="false"
 						title={sourcePage.pageCount > 1
@@ -286,26 +342,14 @@
 							: undefined}
 						aria-label="Markdown input"></textarea>
 				</section>
-			</Resizable.Pane>
-			<Resizable.Handle
-				class="w-px bg-[var(--pane-border)] transition-colors hover:bg-[var(--pane-border-hover)]"
-				ondblclick={() => paneGroup?.setLayout([50, 50])}
-				onkeydown={(event) => {
-					if (event.key === "Home") {
-						event.preventDefault();
-						paneGroup?.setLayout([50, 50]);
-					}
-				}}
-				aria-label="Resize editor and preview. Double-click or press Home to reset."
-				title="Double-click to reset split"
-			/>
-			<Resizable.Pane defaultSize={50} minSize={20} class="h-full min-w-0">
+			{/snippet}
+			{#snippet preview()}
 				<!-- Native buttons in the preview already emit keyboard clicks. -->
 				<!-- svelte-ignore a11y_no_noninteractive_element_interactions, a11y_click_events_have_key_events -->
 				<section
 					bind:this={previewRef}
 					id="preview-pane"
-					class="h-full w-full scrollbar-thin overflow-y-auto bg-[var(--app-bg)] p-4"
+					class="h-full w-full overflow-y-auto bg-(--app-bg) p-4"
 					onclick={handlePreviewClick}
 					aria-label="Markdown preview"
 					tabindex="-1"
@@ -319,31 +363,15 @@
 						<p class="mb-3 text-xs">This section is shown as plain text to keep the preview responsive.</p>
 					{/if}
 					<article class="markdown-body" aria-busy={loading}>
-						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 						{@html renderedHtml}
 					</article>
 				</section>
-			</Resizable.Pane>
-		</Resizable.PaneGroup>
+			{/snippet}
+		</SplitPane>
 	</div>
 </main>
 
 <style>
-	.scrollbar-thin::-webkit-scrollbar {
-		width: 6px;
-		height: 6px;
-	}
-	.scrollbar-thin::-webkit-scrollbar-track {
-		background: var(--scrollbar-track);
-	}
-	.scrollbar-thin::-webkit-scrollbar-thumb {
-		background: var(--scrollbar-thumb);
-		border-radius: 3px;
-	}
-	.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-		background: var(--scrollbar-thumb-hover);
-	}
-
 	.markdown-body {
 		width: 100%;
 		max-width: 100%;
@@ -483,6 +511,9 @@
 		border: 1px solid transparent;
 		width: 1.25rem;
 		height: 1.25rem;
+		/* Align its center with the 0.875rem collapse icon's inset. */
+		margin-inline-end: calc((0.875rem - 1.25rem) / 2);
+		flex-shrink: 0;
 		padding: 3px;
 		cursor: pointer;
 		opacity: 1;

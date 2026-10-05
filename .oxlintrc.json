@@ -1,0 +1,20 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	"plugins": ["eslint", "typescript", "oxc"],
+	"categories": {
+		"correctness": "error"
+	},
+	"env": {
+		"browser": true,
+		"node": true
+	},
+	"overrides": [
+		{
+			"files": ["**/*.svelte", "**/*.svelte.ts", "**/*.svelte.js"],
+			"env": {
+				"svelte": true
+			}
+		}
+	],
+	"ignorePatterns": ["worker-configuration.d.ts"]
+}

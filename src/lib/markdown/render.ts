@@ -1,6 +1,6 @@
 import MarkdownIt from "markdown-it";
 import type { Token } from "markdown-it";
-import { getSourcePage } from "./pagination";
+import type { getSourcePage } from "./pagination";
 import { normalizeLanguage, supportsLanguage } from "./languages";
 
 const MAX_TOKENS = 4_000;
@@ -8,6 +8,12 @@ const MAX_HTML_LENGTH = 300_000;
 const MAX_HIGHLIGHT_LENGTH = 8_000;
 const MAX_HIGHLIGHT_TOTAL = 16_000;
 const MAX_HIGHLIGHT_BLOCKS = 8;
+// Keep repeat edits cheap without retaining an unbounded history of pasted code.
+const MAX_HIGHLIGHT_CACHE_LENGTH = 1_000_000;
+const MAX_HIGHLIGHT_CACHE_ENTRIES = 128;
+const highlightCache = new Map<string, string>();
+let highlightCacheLength = 0;
+let cachedLanguages = "";
 const parser = new MarkdownIt({ html: false, linkify: true, typographer: true, maxNesting: 20 });
 const escape = parser.utils.escapeHtml;
 type RenderEnvironment = { highlighted: Map<Token, string> };
@@ -40,8 +46,7 @@ function tokenCount(tokens: Token[]): number {
 	return count;
 }
 
-export async function renderMarkdown(source: string, page = 0) {
-	const part = getSourcePage(source, page);
+export async function renderMarkdown(part: ReturnType<typeof getSourcePage>) {
 	const env: RenderEnvironment = { highlighted: new Map() };
 	const tokens = parser.parse(part.content, env);
 	let simplified = tokenCount(tokens) > MAX_TOKENS;
@@ -63,15 +68,47 @@ export async function renderMarkdown(source: string, page = 0) {
 				if (supported.length) {
 					const { prepareHighlighter } = await import("./highlighter");
 					const highlighter = await prepareHighlighter([...new Set(supported.map(languageFor))]);
+					const loadedLanguages = highlighter.getLoadedLanguages().sort().join("\0");
+					if (loadedLanguages !== cachedLanguages) {
+						// Newly loaded grammars can improve highlighting of embedded languages.
+						highlightCache.clear();
+						highlightCacheLength = 0;
+						cachedLanguages = loadedLanguages;
+					}
 					for (const token of supported) {
+						const language = languageFor(token);
+						const key = `${language}\0${token.content}`;
+						const cached = highlightCache.get(key);
+						if (cached !== undefined) {
+							highlightCache.delete(key);
+							highlightCache.set(key, cached);
+							env.highlighted.set(token, cached);
+							continue;
+						}
+						const started = performance.now();
 						const highlighted = highlighter.codeToHtml(token.content, {
-							lang: languageFor(token),
+							lang: language,
 							defaultColor: false,
 							themes: { dark: "vitesse-dark", light: "vitesse-light" },
 							tokenizeMaxLineLength: 1_000,
 							tokenizeTimeLimit: 20
 						});
-						if (highlighted.length < MAX_HTML_LENGTH / 2) env.highlighted.set(token, highlighted);
+						if (highlighted.length < MAX_HTML_LENGTH / 2) {
+							env.highlighted.set(token, highlighted);
+							// Leave slow tokenization retryable: its 20ms limit can produce partial highlighting.
+							if (performance.now() - started < 10) {
+								highlightCache.set(key, highlighted);
+								highlightCacheLength += key.length + highlighted.length;
+								while (
+									highlightCacheLength > MAX_HIGHLIGHT_CACHE_LENGTH ||
+									highlightCache.size > MAX_HIGHLIGHT_CACHE_ENTRIES
+								) {
+									const oldest = highlightCache.keys().next().value!;
+									highlightCacheLength -= oldest.length + highlightCache.get(oldest)!.length;
+									highlightCache.delete(oldest);
+								}
+							}
+						}
 					}
 				}
 			} catch {

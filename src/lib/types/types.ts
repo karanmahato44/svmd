@@ -1,8 +1,9 @@
+import type { getSourcePage } from "../markdown/pagination";
+
 export type RenderRequest = {
 	type: "RENDER";
 	id: number;
-	content: string;
-	page?: number;
+	page: ReturnType<typeof getSourcePage>;
 };
 
 export type RenderResponse =
@@ -21,5 +22,5 @@ export type RenderResponse =
 			message: string;
 	  };
 
-export type WorkerMessage = RenderRequest | { type: "PAGE"; id: number; page: number };
+export type WorkerMessage = RenderRequest;
 export type MainMessage = RenderResponse;

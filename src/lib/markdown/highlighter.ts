@@ -8,8 +8,13 @@ export async function prepareHighlighter(names: string[]) {
 	// Cache the promise, not only the resolved instance, so initialization cannot race.
 	highlighterPromise ??= createHighlighterCore({
 		themes: [import("shiki/themes/vitesse-dark.mjs"), import("shiki/themes/vitesse-light.mjs")],
-		langs: [],
+		// Fetch the first requested grammars alongside themes and WASM, not after them.
+		langs: names.filter(supportsLanguage).map((name) => languages[name as keyof typeof languages]()),
 		engine: createOnigurumaEngine(import("shiki/wasm"))
+	}).catch((error) => {
+		// A failed grammar/theme request must not permanently poison initialization.
+		highlighterPromise = undefined;
+		throw error;
 	});
 	const highlighter = await highlighterPromise;
 	const loaded = new Set(highlighter.getLoadedLanguages());

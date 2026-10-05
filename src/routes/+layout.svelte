@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { browser } from "$app/environment";
-	import favicon from "$lib/assets/favicon.svg";
+	import { browser } from "$app/env";
+	import favicon from "#lib/assets/favicon.svg";
 	import { onMount } from "svelte";
 	import "./layout.css";
 
@@ -101,7 +101,6 @@
 	<meta property="twitter:image" content={SITE_IMAGE} />
 
 	<!-- structured data (json-ld) -->
-	<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 	{@html `<script type="application/ld+json">${schemaOrgJson}</scr` + `ipt>`}
 </svelte:head>
 
